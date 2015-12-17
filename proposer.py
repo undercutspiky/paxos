@@ -20,6 +20,36 @@ class proposer():
         self.active = None
         self.mcast_groups = mcast_groups
     
+    def listenToClient(self):
+        
+        mcast_grp = mcast_groups["proposers"]
+        sock_l = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        #sock_l.settimeout(2)
+        sock_l.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock_l.bind(mcast_grp)
+        mreq = struct.pack("4sl", socket.inet_aton(mcast_grp[0]), socket.INADDR_ANY)
+        sock_l.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+        try:
+            while True:
+                print "Waiting to receive some value from client"
+                try:
+                    data, address = sock_l.recvfrom(10240)
+                    data = cp.loads(data)[0]
+                except socket.timeout:
+                    print "Timed out for client"
+                    break
+                else:
+                    print "RECEIVED %s FROM CLIENT %s" % (data,address)
+                    self.prepare(data)
+                    
+        finally:
+            print "selecting %s as leader" % (receivedID)
+            sock.close()
+            sock_l.close()
+            if receivedID == str(self.proposerID):
+                self.active = 1
+        
+    
     def listenToAcceptor(self, sock):
         
         data = None
@@ -28,6 +58,9 @@ class proposer():
             data, address = sock.recvfrom(1024)
         except socket.timeout:
             print "TIMED OUT"
+        if data is None:
+            print "Either timed out or data not received"
+            return
         arr = cp.loads(data)
         if len(arr) == 5:
             self.receivePromise(arr[0],arr[1],arr[2],arr[3], arr[4])
@@ -53,7 +86,7 @@ class proposer():
         
         
         sock_l = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-        sock_l.settimeout(2)
+        sock_l.settimeout(1)
         sock_l.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock_l.bind(mcast_grp)
         mreq = struct.pack("4sl", socket.inet_aton(mcast_grp[0]), socket.INADDR_ANY)
@@ -95,11 +128,14 @@ class proposer():
         message = cp.dumps(arr)
         self.sendMessage(message, self.mcast_groups["acceptors"])
 
-    def prepare(self):
+    def prepare(self, proposedValue = None):
     
         self.randInt += 1
-        self.sequenceNumber += 1 
-        self.proposedValue = int(str(random.randint(1,5000))+str(self.proposerID))
+        self.sequenceNumber += 1
+        if proposedValue is not None:
+            self.proposedValue = proposedValue
+        else:
+            self.proposedValue = int(str(random.randint(1,5000))+str(self.proposerID))
         self.proposalID = str(self.randInt) + str(self.proposerID)
         self.receivedPromises.clear()
         self.sendPrepare(str(self.proposalID))
@@ -147,9 +183,9 @@ class proposer():
     def sendMessage(self, message, mcast_grp, listen=True, sleep=False):
         
         if(sleep):
-            time.sleep(1.5)
+            time.sleep(0.2)
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.settimeout(2)
+        #sock.settimeout(0.15)
         # Set the time-to-live for messages to 1 
         ttl = struct.pack('b', 1)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
@@ -196,7 +232,7 @@ if __name__ == '__main__':
     if ppr.active == 1:
         for x in xrange(5):
             print "STARTING PHASE 1"
-            t = threading.Thread(target = ppr.prepare)
+            t = threading.Thread(target = ppr.listenToClient)
             t.start()
             t.join()
         
