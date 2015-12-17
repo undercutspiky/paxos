@@ -11,15 +11,12 @@ class learner():
         self.learnerID = learnerID
         self.learnedValues = {}
         self.mcast_groups = mcast_groups
-        while True:
-            t = threading.Thread(target = self.listen)
-            t.start()
-            t.join()
-    
-    def listen(self):
         
         mcast_grp = mcast_groups["learners"]
-
+        sock_s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        ttl = struct.pack('b', 1)
+        sock_s.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
+        
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(mcast_grp)
@@ -27,7 +24,19 @@ class learner():
 
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
         
+        
+        
+        while True:
+            t = threading.Thread(target = self.listen, args=(sock,sock_s))
+            t.start()
+            t.join()
+    
+    def listen(self, sock, sock_s):
+        
+        mcast_grp = mcast_groups["learners"]
+        
         data, address = sock.recvfrom(1024)
+        #sent = sock_s.sendto(data, mcast_grp)
         arr = cp.loads(data)
         
         if len(arr) == 2:
