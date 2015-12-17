@@ -14,12 +14,10 @@ class acceptor():
         self.acceptorID = acceptorID
         self.mcast_groups = mcast_groups
         
-        while True:
-            t = threading.Thread(target = self.listen)
-            t.start()
-            t.join()
-    
-    def listen(self):
+        self.sock_s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        ttl = struct.pack('b', 1)
+        self.sock_s.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
+        
         
         mcast_grp = self.mcast_groups["acceptors"]
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
@@ -29,6 +27,14 @@ class acceptor():
 
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
         
+        while True:
+            t = threading.Thread(target = self.listen, args=(sock,))
+            t.start()
+            t.join()
+    
+    def listen(self, sock):
+        
+        mcast_grp = self.mcast_groups["acceptors"]
         print "WAITING FOR DATA FROM %s================================" % repr(mcast_grp)
         data, address = sock.recvfrom(10240)
         print "WAIT OVER======================"
@@ -85,19 +91,14 @@ class acceptor():
     
     def sendMessage(self, message, fromID, mcast_grp):
         
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		
-		# Set the time-to-live for messages to 1 
-        ttl = struct.pack('b', 1)
-        sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
         try:
 		    # Send data to the multicast group
             #print 'sending "%s"' % message
-            sent = sock.sendto(message, fromID)
+            sent = self.sock_s.sendto(message, fromID)
 		    # Look for responses from all proposers
         finally:
-            print 'closing socket'
-            sock.close()
+            print 'closing socket or maybe not'
+            #self.sock_s.close()
             
             
 if __name__ == '__main__':
