@@ -35,9 +35,9 @@ class acceptor():
     def listen(self, sock):
         
         mcast_grp = self.mcast_groups["acceptors"]
-        print "WAITING FOR DATA FROM %s================================" % repr(mcast_grp)
+        #print "WAITING FOR DATA FROM %s================================" % repr(mcast_grp)
         data, address = sock.recvfrom(10240)
-        print "WAIT OVER======================"
+        #print "WAIT OVER======================"
         arr = cp.loads(data)
         
         if len(arr) == 2:
@@ -77,7 +77,7 @@ class acceptor():
             self.promisedID = proposalID
             self.acceptedID = proposalID
             self.acceptedValue[sequenceNumber] = value
-            print "ACCEPTED THE VALUE "+str(value)
+            #print "ACCEPTED THE VALUE "+str(value)
             self.sendAccepted(self.acceptedID, self.acceptedValue[sequenceNumber], fromID, sequenceNumber)
         else:
             print "\n===========SENDING NACK TO PROPOSER FOR ACCEPTANCE================\n"
@@ -85,7 +85,7 @@ class acceptor():
     
     def sendAccepted(self, acceptedID, acceptedValue, fromID, sequenceNumber):
         
-        arr = [acceptedID, acceptedValue, sequenceNumber]
+        arr = [self.acceptorID, acceptedID, acceptedValue, sequenceNumber]
         message = cp.dumps(arr)
         self.sendMessage(message, fromID, self.mcast_groups["proposers"])
     
