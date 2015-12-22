@@ -13,6 +13,7 @@ class proposer():
         self.randInt = random.randint(1,5000)
         self.proposalID = str(self.randInt) + str(self.proposerID)
         self.receivedPromises = set()
+        self.receivedAcceptances = set()
         self.proposedValue = int(str(random.randint(1,5000))+str(self.proposerID))
         self.lastAcceptedID = None
         self.quorumSize = 2
@@ -64,8 +65,8 @@ class proposer():
         arr = cp.loads(data)
         if len(arr) == 5:
             self.receivePromise(arr[0],arr[1],arr[2],arr[3], arr[4])
-        elif len(arr) == 3:
-            self.receiveAccepted(arr[0],arr[1], arr[2])
+        elif len(arr) == 4:
+            self.receiveAccepted(arr[0],arr[1], arr[2], arr[3])
         elif len(arr) == 1:
             if arr[0] == -1:
                 print "Nack received"
@@ -138,6 +139,7 @@ class proposer():
             self.proposedValue = int(str(random.randint(1,5000))+str(self.proposerID))
         self.proposalID = str(self.randInt) + str(self.proposerID)
         self.receivedPromises.clear()
+        self.receivedAcceptances.clear()
         self.sendPrepare(str(self.proposalID))
     
 
@@ -160,19 +162,23 @@ class proposer():
                 
             self.sendAccept(self.proposalID, str(self.proposedValue))
     
-    def receiveAccepted(self, acceptedID, acceptedValue, sequenceNumber):
+    def receiveAccepted(self, fromID, acceptedID, acceptedValue, sequenceNumber):
         print "\nRECEIVED ACCEPTANCE MSG :\n"
         print acceptedID, acceptedValue, sequenceNumber
         print "\n"
         
-        #Pass the value to learners
-        message = cp.dumps([sequenceNumber, acceptedValue])
-        self.sendMessage(message, self.mcast_groups["learners"], False)
+        if self.sequenceNumber == sequenceNumber and acceptedID == self.proposalID and self.proposedValue == acceptedValue:
+            self.receivedAcceptances.add(fromID)
+        
+        if len(self.receivedAcceptances) == self.quorumSize:
+            #Pass the value to learners
+            message = cp.dumps([sequenceNumber, acceptedValue])
+            self.sendMessage(message, self.mcast_groups["learners"], False)
     
     def sendAccept(self, proposalID, proposedValue):
         
         arr = [proposalID, proposedValue, self.sequenceNumber]
-        print "============PROPOSAL VALUE IS %s================"%(proposedValue)
+        #print "============PROPOSAL VALUE IS %s================"%(proposedValue)
         message = cp.dumps(arr)
         
         if self.sequenceNumber == 1:
@@ -192,7 +198,7 @@ class proposer():
         try:
             # Send data to the multicast group
             #print 'SENDING SOME MESSAGE "%s"' % message
-            print "SENDING TO %s" % repr(mcast_grp)
+            #print "SENDING TO %s" % repr(mcast_grp)
             sent = sock.sendto(message, mcast_grp)
             
             if listen:
@@ -207,7 +213,7 @@ class proposer():
                 for i in xrange(self.quorumSize):
                     t[i].join()
         finally:
-            print 'closing socket'
+            #print 'closing socket'
             sock.close()
 
 if __name__ == '__main__':
@@ -235,4 +241,3 @@ if __name__ == '__main__':
             t = threading.Thread(target = ppr.listenToClient)
             t.start()
             t.join()
-        
